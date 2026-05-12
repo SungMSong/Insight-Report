@@ -14,7 +14,7 @@ except:
     st.error("GOOGLE_API_KEY is not set in Secrets.")
 
 # 3. Model settings (gemini-1.5-flash capable of image analysis)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 # 4. Upload image
 uploaded_file = st.file_uploader("Upload a power report image.", type=['png', 'jpg', 'jpeg'])
