@@ -42,4 +42,4 @@ if uploaded_file:
                 st.markdown(response.text)
             except Exception as e:
                 st.error(f"오류가 발생했습니다: {e}")
-                st.info("API 키가 생성된 지 얼마 안 되었다면 1~2분 후 다시 시도해 보세요.
+                st.info("API 키가 생성된 지 얼마 안 되었다면 1~2분 후 다시 시도해 보세요.)
