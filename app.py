@@ -40,7 +40,15 @@ if uploaded_file:
     if st.button("AI 분석 시작"):
         with st.spinner(f"분석 중... (연결 모델: {selected_model_name})"):
             try:
-                prompt = "이 전력 리포트 이미지에서 피크 전력, 역률 저하 구간, 특이사항을 한국어로 상세히 분석해줘."
+                prompt = """
+이 전력 리포트 이미지를 분석하여 핵심만 요약해줘. 
+모든 답변은 한국어로, 아주 간결하게 작성할 것.
+
+1. **피크 전력**: 발생 시간대와 수치 (한 줄)
+2. **역률 상태**: 저하 구간 여부와 주의사항 (한 줄)
+3. **설비 특이사항**: 계측기 제외 등 이상 징후 (한 줄)
+4. **Action Item**: 비용 절감을 위한 핵심 실행 방안 2-3가지만 요약
+"""
                 response = model.generate_content([prompt, image])
                 
                 st.success("✅ 분석 완료!")
