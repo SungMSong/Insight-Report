@@ -2,42 +2,33 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. Page settings
-st.set_page_config(page_title="Power Report Analyzer (Free)", layout="wide")
-st.title("⚡ Power Report AI Analyzer (Gemini)")
+st.set_page_config(page_title="전력 리포트 분석기", layout="wide")
+st.title("⚡ 전력 리포트 AI 분석기 (무료 버전)")
 
-# 2. Gemini API key settings (using Streamlit Secrets)
-# Save the key issued from Google AI Studio as GOOGLE_API_KEY in Secrets.
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-except:
-    st.error("GOOGLE_API_KEY is not set in Secrets.")
+# API 키 설정
+if "GOOGLE_API_KEY" not in st.secrets:
+    st.error("Secrets에 GOOGLE_API_KEY를 등록해주세요.")
+    st.stop()
 
-# 3. Model settings (gemini-1.5-flash capable of image analysis)
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-# 4. Upload image
-uploaded_file = st.file_uploader("Upload a power report image.", type=['png', 'jpg', 'jpeg'])
+# 모델 설정 (가장 최신 모델 사용)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+uploaded_file = st.file_uploader("리포트 이미지를 업로드하세요.", type=['png', 'jpg', 'jpeg'])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption='Uploaded report', use_column_width=True)
+    st.image(image, caption='업로드된 리포트', use_column_width=True)
     
-    if st.button("Analyze with free AI"):
-        with st.spinner("Gemini AI is analyzing..."):
-            # Prompt configuration
-            prompt = """
-            You are an energy management expert. Analyze the following in Korean based on this power report image:
-            1. Peak power generation time and characteristics on the graph
-            2. Points where the power factor drops and warnings
-            3. Operational anomalies such as 'manually excluded' meters in the table below
-            4. Three specific action items for cost reduction
-            """
-            
-            # Gemini analysis request
-            response = model.generate_content([prompt, image])
-            
-            st.success("✅ Analysis complete!")
-            st.markdown("---")
-            st.subheader("💡 AI Analysis Insights")
-            st.write(response.text)
+    if st.button("AI 분석 시작"):
+        with st.spinner("분석 중입니다..."):
+            try:
+                prompt = "이 전력 리포트 이미지에서 피크 전력, 역률 저하 구간, 특이사항을 한국어로 분석해줘."
+                # 분석 요청
+                response = model.generate_content([prompt, image])
+                
+                st.success("분석 완료!")
+                st.write(response.text)
+            except Exception as e:
+                st.error(f"오류가 발생했습니다: {e}")
