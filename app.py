@@ -13,7 +13,7 @@ if "GOOGLE_API_KEY" not in st.secrets:
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
 # 모델 설정 (가장 최신 모델 사용)
-model = genai.GenerativeModel('gemini-1.5-flash-latest')
+model = genai.GenerativeModel('models/gemini-1.5-flash-001')
 
 uploaded_file = st.file_uploader("리포트 이미지를 업로드하세요.", type=['png', 'jpg', 'jpeg'])
 
