@@ -24,7 +24,7 @@ def load_model():
     # 못 찾을 경우 기본값
     return genai.GenerativeModel('gemini-1.5-flash')
 
-model = load_model()
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 uploaded_file = st.file_uploader("리포트 이미지를 업로드하세요.", type=['png', 'jpg', 'jpeg'])
 
