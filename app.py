@@ -19,18 +19,23 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 @st.cache_resource
 def get_available_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    # 우선순위 필터링
     for name in available_models:
         if 'gemini-1.5-flash' in name: return name
     for name in available_models:
         if 'gemini-1.5-pro' in name: return name
-    return available_models if available_models else None
+    
+    # [버그 수정] 리스트가 아닌 리스트의 첫 번째 원소(문자열)를 반환하도록 처리
+    return available_models[0] if available_models else None
 
+# 단일 문자열(String)이 정상적으로 반환됩니다.
 selected_model_name = get_available_model()
 
 if not selected_model_name:
     st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다. API 키 설정을 확인해주세요.")
     st.stop()
 
+# 'models/gemini-1.5-flash' 형태의 문자열과 정상 결합됩니다.
 model = genai.GenerativeModel(model_name=selected_model_name)
 
 # 3. 사이드바 다중 이미지 업로드 레이아웃
@@ -104,7 +109,7 @@ if current_file and past_file:
 
                 st.divider()
 
-                # 6. 중단 비교 차트 시각화 구성 (st.bar_chart 내장 함수 활용 버전)
+                # 6. 중단 비교 차트 시각화 구성 (내장 차트 사용 버전)
                 c_chart1, c_chart2, c_chart3 = st.columns(3)
 
                 with c_chart1:
