@@ -6,7 +6,7 @@ import json
 
 # 1. 페이지 초기 설정
 st.set_page_config(page_title="CVRMS 리포트 분석", layout="wide", initial_sidebar_state="expanded")
-st.title("🏭 CVRMS 과거 비교 분석 시스템")
+st.title("🏭 CVRMS 리포트 분석 시스템")
 st.caption("한솔제지 신탄진공장 설비 계통 및 전력 절감 품질 비교 대시보드")
 
 # 2. API 키 및 모델 확인 구역
