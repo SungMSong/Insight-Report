@@ -19,18 +19,23 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 @st.cache_resource
 def get_available_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    # 우선순위 필터링
     for name in available_models:
         if 'gemini-1.5-flash' in name: return name
     for name in available_models:
         if 'gemini-1.5-pro' in name: return name
-    return available_models if available_models else None
+    
+    # [완벽 수정] 리스트가 존재할 경우 반드시 첫 번째 원소 '문자열'을 반환함
+    return available_models[0] if available_models else None
 
+# 이제 단일 문자열이 정상적으로 할당됩니다.
 selected_model_name = get_available_model()
 
 if not selected_model_name:
     st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다. API 키 설정을 확인해주세요.")
     st.stop()
 
+# 'models/' + 'models/gemini-1.5-flash' 형태의 문자열 결합이 에러 없이 수행됩니다.
 model = genai.GenerativeModel(model_name=selected_model_name)
 
 # 3. 사이드바 다중 이미지 업로드 레이아웃
