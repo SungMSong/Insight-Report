@@ -19,23 +19,18 @@ genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 @st.cache_resource
 def get_available_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    # 우선순위 필터링
     for name in available_models:
         if 'gemini-1.5-flash' in name: return name
     for name in available_models:
         if 'gemini-1.5-pro' in name: return name
-    
-    # [버그 수정] 리스트가 아닌 리스트의 첫 번째 원소(문자열)를 반환하도록 처리
-    return available_models[0] if available_models else None
+    return available_models if available_models else None
 
-# 단일 문자열(String)이 정상적으로 반환됩니다.
 selected_model_name = get_available_model()
 
 if not selected_model_name:
     st.error("사용 가능한 Gemini 모델을 찾을 수 없습니다. API 키 설정을 확인해주세요.")
     st.stop()
 
-# 'models/gemini-1.5-flash' 형태의 문자열과 정상 결합됩니다.
 model = genai.GenerativeModel(model_name=selected_model_name)
 
 # 3. 사이드바 다중 이미지 업로드 레이아웃
@@ -87,29 +82,51 @@ if current_file and past_file:
                 data = json.loads(response.text)
                 st.success("✅ CVRMS 분석 및 데이터 연동 완료!")
                 
-                # 5. 상단 대시보드 지표 카드 출력 (Metric)
+                # 5. 상단 대시보드 지표 카드 출력
                 st.markdown("### 📊 주요 운영 지표 비교")
                 m1, m2, m3, m4, m5 = st.columns(5)
                 
                 with m1:
                     krw_delta = data["current"]["saving_krw"] - data["past"]["saving_krw"]
-                    st.metric(label="일간 절감 요금", value=f"{data['current']['saving_krw']:,} 원", delta=f"{krw_delta:+:,} 원")
+                    sign = "+" if krw_delta > 0 else ""
+                    st.metric(
+                        label="일간 절감 요금", 
+                        value=f"{data['current']['saving_krw']:,} 원", 
+                        delta=f"{sign}{krw_delta:,} 원"
+                    )
                 with m2:
                     kwh_delta = data["current"]["saving_kwh"] - data["past"]["saving_kwh"]
-                    st.metric(label="일간 절감량", value=f"{data['current']['saving_kwh']:.3f} kWh", delta=f"{kwh_delta:+.3f} kWh")
+                    st.metric(
+                        label="일간 절감량", 
+                        value=f"{data['current']['saving_kwh']:.3f} kWh", 
+                        delta=f"{kwh_delta:+.3f} kWh"
+                    )
                 with m3:
                     total_delta = data["current"]["total_kwh"] - data["past"]["total_kwh"]
-                    st.metric(label="일간 전체 사용 전력량", value=f"{data['current']['total_kwh']:,} kWh", delta=f"{total_delta:+,.3f} kWh")
+                    t_sign = "+" if total_delta > 0 else ""
+                    st.metric(
+                        label="일간 전체 사용 전력량", 
+                        value=f"{data['current']['total_kwh']:,} kWh" if isinstance(data['current']['total_kwh'], int) else f"{data['current']['total_kwh']:,.3f} kWh", 
+                        delta=f"{t_sign}{total_delta:,.3f} kWh"
+                    )
                 with m4:
                     cvrf_delta = data["current"]["cvrf_rate"] - data["past"]["cvrf_rate"]
-                    st.metric(label="일간 절감률 (CVRf)", value=f"{data['current']['cvrf_rate']}%", delta=f"{cvrf_delta:+.3f}%")
+                    st.metric(
+                        label="일간 절감률 (CVRf)", 
+                        value=f"{data['current']['cvrf_rate']}%", 
+                        delta=f"{cvrf_delta:+.3f}%"
+                    )
                 with m5:
                     tap_delta = data["current"]["tap"] - data["past"]["tap"]
-                    st.metric(label="Tap 전환 횟수", value=f"{data['current']['tap']} 회", delta=f"{tap_delta:+} 회")
+                    st.metric(
+                        label="Tap 전환 횟수", 
+                        value=f"{data['current']['tap']} 회", 
+                        delta=f"{tap_delta:+} 회"
+                    )
 
                 st.divider()
 
-                # 6. 중단 비교 차트 시각화 구성 (내장 차트 사용 버전)
+                # 6. 중단 비교 차트 시각화 구성
                 c_chart1, c_chart2, c_chart3 = st.columns(3)
 
                 with c_chart1:
