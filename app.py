@@ -1,22 +1,25 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import pandas as pd
+import plotly.express as px
+import json
 
-st.set_page_config(page_title="전력 리포트 분석기", layout="wide")
-st.title("⚡ 전력 리포트 AI 분석기")
+# 1. 페이지 초기 설정
+st.set_page_config(page_title="CVRMS 리포트 분석", layout="wide", initial_sidebar_state="expanded")
+st.title("🏭 CVRMS 과거 비교 분석 시스템")
+st.caption("한솔제지 신탄진공장 설비 계통 및 전력 절감 품질 비교 대시보드")
 
-# API 키 설정
+# 2. API 키 및 모델 확인 구역
 if "GOOGLE_API_KEY" not in st.secrets:
     st.error("Secrets에 GOOGLE_API_KEY를 등록해주세요.")
     st.stop()
 
 genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 
-# [해결책] 사용 가능한 모델을 자동으로 찾는 함수
 @st.cache_resource
 def get_available_model():
     available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    # 우선순위: gemini-1.5-flash -> gemini-1.5-pro -> 리스트의 첫 번째 모델
     for name in available_models:
         if 'gemini-1.5-flash' in name: return name
     for name in available_models:
@@ -31,24 +34,133 @@ if not selected_model_name:
 
 model = genai.GenerativeModel(model_name=selected_model_name)
 
-uploaded_file = st.file_uploader("리포트 이미지를 업로드하세요.", type=['png', 'jpg', 'jpeg'])
+# 3. 사이드바 다중 이미지 업로드 레이아웃
+st.sidebar.header("📸 리포트 이미지 업로드")
+current_file = st.sidebar.file_uploader("🔴 현재 분석 리포트", type=["png", "jpg", "jpeg"], key="curr_img")
+past_file = st.sidebar.file_uploader("🔵 과거 비교 리포트", type=["png", "jpg", "jpeg"], key="past_img")
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='업로드된 리포트', use_column_width=True)
+if current_file and past_file:
+    current_image = Image.open(current_file)
+    past_image = Image.open(past_file)
     
-    if st.button("AI 분석 시작"):
-        with st.spinner(f"분석 중... (연결 모델: {selected_model_name})"):
+    if st.button("🚀 두 리포트 데이터 비교 분석 시작", use_container_width=True):
+        with st.spinner(f"AI가 두 이미지의 데이터를 정밀 비교 분석 중입니다... ({selected_model_name})"):
             try:
+                # 4. 규격화된 JSON 데이터 추출을 위한 전용 프롬프트
                 prompt = """
-이 전력 리포트 이미지를 분석하여 유효한 정보 핵심만 요약해줘. 
-모든 답변은 한국어로, 아주 간결하게 작성할 것.
+제공된 두 장의 CVRMS 전력 리포트 이미지(첫 번째: 현재 리포트, 두 번째: 과거 리포트)를 정밀 대조하여 분석 데이터를 JSON 형식으로 반환해라.
 
+[추출 및 분석 규칙]
+1. 각 이미지의 상단 '분석 기간'에서 날짜(YYYY-MM-DD 형식)를 추출할 것.
+2. 각 이미지의 대시보드 지표에서 다음 데이터를 찾아내어 숫자로 변환할 것:
+   - 일간 절감 요금 (단위: 원, 이미지 내 '일간 빌링액' 또는 인사이트의 '에너지 절감' 금액 참고)
+   - 일간 절감량 (단위: kWh, 이미지 내 '일간 빌링량' 참고)
+   - 일간 절감률 (CVRf) (단위: %, 이미지 내 '일간 절감률(CVRf)' 참고)
+   - Tap 전환 횟수 (단위: 회, 이미지 내 'Tap 전환 횟수' 참고)
+   - 일간 전체 사용 전력량 (단위: kWh, 이미지 내 '시뮬 전력량' 또는 '사용 전력량' 참고)
+   - 평균 역률 (단위: %, 이미지 중앙의 '역률(%)' 그래프 범위 참고)
+   - 계측기 제외 장비 수 (단위: 개, 이미지 하단 '계측기 제외 현황'의 전체 개수 참고)
+
+반드시 아래의 JSON 스키마 규격으로만 답변을 반환해야 하며, 다른 텍스트 설명은 제외해라:
+{
+  "current": {
+    "date": "현재 날짜",
+    "saving_krw": 현재_절감요금_숫자,
+    "saving_kwh": 현재_절감량_숫자,
+    "cvrf_rate": 현재_절감률_숫자,
+    "tap": 현재_탭전환_숫자,
+    "total_kwh": 현재_전체사용량_숫자,
+    "pf_avg": 현재_평균역률_숫자,
+    "excluded": 현재_제외장비_숫자
+  },
+  "past": {
+    "date": "과거 날짜",
+    "saving_krw": 과거_절감요금_숫자,
+    "saving_kwh": 과거_절감량_숫자,
+    "cvrf_rate": 과거_절감률_숫자,
+    "tap": 과거_탭전환_숫자,
+    "total_kwh": 과거_전체사용량_숫자,
+    "pf_avg": 과거_평균역률_숫자,
+    "excluded": 과거_제외장비_숫자
+  },
+  "ai_analysis": "두 시점의 데이터를 비교하여 마크다운 형식으로 친절하게 작성한 종합 진단 요약 내용"
+}
 """
-                response = model.generate_content([prompt, image])
+                # JSON 출력 모드를 설정하여 Gemini 호출 (정형 데이터 강제)
+                response = model.generate_content(
+                    [prompt, current_image, past_image],
+                    generation_config={"response_mime_type": "application/json"}
+                )
                 
-                st.success("✅ 분석 완료!")
-                st.markdown(response.text)
+                # 5. JSON 데이터 로드
+                data = json.loads(response.text)
+                st.success("✅ CVRMS 분석 및 데이터 연동 완료!")
+                
+                # 6. 상단 대시보드 지표 카드 출력 (Metric)
+                st.markdown("### 📊 주요 운영 지표 비교")
+                m1, m2, m3, m4, m5 = st.columns(5)
+                
+                with m1:
+                    krw_delta = data["current"]["saving_krw"] - data["past"]["saving_krw"]
+                    st.metric(label="일간 절감 요금", value=f"{data['current']['saving_krw']:,} 원", delta=f"{krw_delta:+:,} 원")
+                with m2:
+                    kwh_delta = data["current"]["saving_kwh"] - data["past"]["saving_kwh"]
+                    st.metric(label="일간 절감량", value=f"{data['current']['saving_kwh']:.3f} kWh", delta=f"{kwh_delta:+.3f} kWh")
+                with m3:
+                    total_delta = data["current"]["total_kwh"] - data["past"]["total_kwh"]
+                    st.metric(label="일간 전체 사용 전력량", value=f"{data['current']['total_kwh']:,} kWh", delta=f"{total_delta:+,.3f} kWh")
+                with m4:
+                    cvrf_delta = data["current"]["cvrf_rate"] - data["past"]["cvrf_rate"]
+                    st.metric(label="일간 절감률 (CVRf)", value=f"{data['current']['cvrf_rate']}%", delta=f"{cvrf_delta:+.3f}%")
+                with m5:
+                    tap_delta = data["current"]["tap"] - data["past"]["tap"]
+                    st.metric(label="Tap 전환 횟수", value=f"{data['current']['tap']} 회", delta=f"{tap_delta:+} 회")
+
+                st.divider()
+
+                # 7. 중단 비교 차트 시각화 구성
+                c_chart1, c_chart2, c_chart3 = st.columns(3)
+
+                with c_chart1:
+                    st.markdown("#### ⚡ 일간 절감량 비교")
+                    saving_df = pd.DataFrame({"비교 시점": ["과거", "현재"], "절감량(kWh)": [data["past"]["saving_kwh"], data["current"]["saving_kwh"]]})
+                    fig1 = px.bar(saving_df, x="비교 시점", y="절감량(kWh)", color="비교 시점", color_discrete_map={"현재": "#FF4B4B", "과거": "#1F77B4"}, text_auto=".3f")
+                    fig1.update_layout(height=260, showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
+                    st.plotly_chart(fig1, use_container_width=True)
+
+                with c_chart2:
+                    st.markdown("#### 🔋 일간 전체 사용 전력량 비교")
+                    total_df = pd.DataFrame({"비교 시점": ["과거", "현재"], "전체 사용량(kWh)": [data["past"]["total_kwh"], data["current"]["total_kwh"]]})
+                    fig2 = px.bar(total_df, x="비교 시점", y="전체 사용량(kWh)", color="비교 시점", color_discrete_map={"현재": "#2CA02C", "과거": "#9467BD"}, text_auto=",.3f")
+                    fig2.update_layout(height=260, showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
+                    st.plotly_chart(fig2, use_container_width=True)
+
+                with c_chart3:
+                    st.markdown("#### 📉 계통 품질 역률 비교")
+                    pf_df = pd.DataFrame({"비교 시점": ["과거", "현재"], "평균 역률(%)": [data["past"]["pf_avg"], data["current"]["pf_avg"]]})
+                    fig3 = px.bar(pf_df, x="비교 시점", y="평균 역률(%)", color="비교 시점", color_discrete_map={"현재": "#FFBB00", "과거": "#7F7F7F"}, text_auto=".1f")
+                    fig3.update_layout(height=260, showlegend=False, margin=dict(l=10, r=10, t=10, b=10))
+                    st.plotly_chart(fig3, use_container_width=True)
+
+                st.divider()
+
+                # 8. 하단 AI 종합 리포트 출력
+                st.markdown("#### 🤖 AI 계통 및 에너지 절감 실적 진단 리포트")
+                st.info(data["ai_analysis"])
+
+                st.divider()
+
+                # 9. 원본 이미지 대조 접기 메뉴
+                with st.expander("🔍 업로드된 원본 리포트 이미지 대조 보기"):
+                    img_col1, img_col2 = st.columns(2)
+                    with img_col1:
+                        st.image(current_image, caption=f"현재 리포트 ({data['current']['date']})", use_container_width=True)
+                    with img_col2:
+                        st.image(past_image, caption=f"과거 리포트 ({data['past']['date']})", use_container_width=True)
+
             except Exception as e:
-                st.error(f"오류가 발생했습니다: {e}")
-                st.info("API 키가 활성화되는 중일 수 있습니다. 1분 뒤 다시 시도해 보세요.")
+                st.error(f"데이터 연동 중 오류가 발생했습니다: {e}")
+                st.info("LLM 데이터 출력 형식이 일치하지 않거나 누락되었을 수 있습니다. 다시 시도해 주세요.")
+
+else:
+    st.info("💡 왼쪽 사이드바에서 '현재 리포트'와 '과거 비교 리포트' 이미지를 모두 업로드하면 대시보드가 활성화됩니다.")
